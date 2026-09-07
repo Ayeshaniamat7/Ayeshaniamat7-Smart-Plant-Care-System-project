@@ -1,0 +1,29 @@
+# Microcontroller secret credentials
+hardware/**/secrets.h
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+
+# Android / Gradle
+android/.gradle
+android/captures/
+android/app/google-services.json
+android/key.properties
+
+# iOS / Xcode
+ios/Runner/GoogleService-Info.plist
+ios/Pods/
+ios/.symlinks/
+
+# Environment and IDE
+.env
+.vscode/
+.idea/
+*.swp
+*.DS_Store

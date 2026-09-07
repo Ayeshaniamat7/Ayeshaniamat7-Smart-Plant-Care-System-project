@@ -1,0 +1,39 @@
+{
+  "users": {
+    "USR_987654321_ABC": {
+      "uid": "USR_987654321_ABC",
+      "email": "gardener@example.com",
+      "displayName": "Alex Green",
+      "createdAt": 1724123400000
+    }
+  },
+  "plants": {
+    "PLANT_001_MONSTERA": {
+      "plantId": "PLANT_001_MONSTERA",
+      "userId": "USR_987654321_ABC",
+      "name": "Living Room Monstera",
+      "species": "Monstera Deliciosa",
+      "deviceId": "plant_node_01",
+      "minSoilMoisture": 30,
+      "maxSoilMoisture": 75,
+      "minTemperature": 18.0,
+      "maxTemperature": 30.0,
+      "minLightLevel": 40,
+      "maxLightLevel": 90,
+      "imageUrl": "https://images.unsplash.com/photo-1614594975525-e45190c55d0b",
+      "createdAt": 1724123500000
+    }
+  },
+  "devices": {
+    "plant_node_01": {
+      "live": {
+        "temperature": 24.5,
+        "humidity": 58.2,
+        "soilMoisture": 45,
+        "lightLevel": 72,
+        "timestamp": 1724123600000,
+        "status": "online"
+      }
+    }
+  }
+}
