@@ -111,7 +111,7 @@ class PlantManagementScreen extends StatelessWidget {
                       );
 
                       await Provider.of<PlantService>(context, listen: false).addPlant(newPlant);
-                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (context.mounted) Navigator.pop(ctx);
                     }
                   },
                   child: const Text("Save Plant", style: TextStyle(color: Colors.white)),
