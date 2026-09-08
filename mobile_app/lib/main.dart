@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'firebase_options.dart';
 import 'services/auth_service.dart';
 import 'services/plant_service.dart';
 import 'services/sensor_service.dart';
@@ -12,12 +13,10 @@ import 'views/dashboard/live_dashboard_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Note: Ensure google-services.json (Android) / GoogleService-Info.plist (iOS) are configured
-  try {
-    await Firebase.initializeApp();
-  } catch (e) {
-    debugPrint("Firebase initialization note: Ensure configuration files exist for production build.");
-  }
+  // Initialize Firebase properly with default platform options
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   runApp(
     MultiProvider(
