@@ -1,114 +1,311 @@
-# Smart Plant Care System - 70% Prototype Figma UI/UX Design Specification
+# Smart Plant Care System - 100% Complete Figma UI/UX Design Specification
 
-This specification details the UI layout structure, design tokens, responsive grid system, and component architecture required for designing the **70% Prototype Phase** in **Figma**.
+This specification outlines the final UI/UX architecture for the complete Smart Plant Care System. It covers the fully integrated experience for sensor monitoring, AI recommendation, smart irrigation automation, alerting, and historical analytics.
 
 ---
 
 ## 🎨 1. Design System & Style Tokens
 
 ### 1.1 Color Palette
-* **Primary Brand Green**: `#2E7D32` (Forest Green - Headers, Primary Buttons, Active Accents)
-* **Secondary Emerald**: `#4CAF50` (Vibrant Emerald - Status badges, Progress indicators)
-* **Background Dark / Light**: `#0F172A` (Dark Slate Mode) / `#F8FAFC` (Light Crisp Background)
-* **Surface Card Fill**: `#1E293B` (Dark Card Surface) / `#FFFFFF` (Light Glass Surface)
-* **Accent Warning/Alert**: `#FFB300` (Warm Amber - Low Soil Moisture warning)
-* **Text Primary**: `#F8FAFC` (Dark Mode) / `#0F172A` (Light Mode)
-* **Text Secondary**: `#94A3B8` (Muted Subtitles)
+* **Primary Brand Green**: `#2E7D32` (Forest Green - headers, primary actions, active states)
+* **Secondary Emerald**: `#4CAF50` (highlight accents, status pills, progress indicators)
+* **Deep Background**: `#0F172A` (dark mode base)
+* **Card Background**: `#1E293B` (dark cards)
+* **Surface Light**: `#F8FAFC` (light mode base)
+* **Warning Accent**: `#FFB300` (amber alert state)
+* **Critical Accent**: `#F44336` (urgent warning / pump risk)
+* **Info Accent**: `#60A5FA` (blue / analytics / neutral info)
+* **Text Primary**: `#F8FAFC` (dark mode) / `#0F172A` (light mode)
+* **Text Secondary**: `#94A3B8` (muted labels / helper text)
+* **Success Accent**: `#22C55E` (healthy plant status)
 
 ### 1.2 Typography (Google Fonts - Inter / Outfit)
 * **Heading 1 (Screen Titles)**: SemiBold 24px, Line Height 32px
 * **Heading 2 (Card Titles)**: SemiBold 18px, Line Height 24px
-* **Metric Display (Sensor Numbers)**: Bold 32px, Line Height 38px
+* **Metric Display**: Bold 32px, Line Height 38px
+* **Section Label**: Medium 12px, Line Height 16px
 * **Body Text**: Regular 14px, Line Height 20px
 * **Caption / Timestamp**: Medium 12px, Line Height 16px
 
 ### 1.3 Card & Component Elevation
-* **Corner Radius**: `16px` for Metric Cards & Plant Cards; `12px` for Input fields & Buttons.
-* **Drop Shadow**: `0px 8px 24px rgba(0, 0, 0, 0.08)` (Soft Ambient Shadow).
+* **Corner Radius**: `16px` for metric cards and plant cards; `12px` for inputs and buttons
+* **Shadow**: `0px 8px 24px rgba(0, 0, 0, 0.08)`
+* **Status Dot Size**: `8px` for online/alert indicators
+* **Progress Ring Thickness**: `10px`
 
 ---
 
 ## 📱 2. Screen-by-Screen Layout Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     FIGMA SCREEN ARCHITECTURE                   │
-├─────────────────┬───────────────────┬───────────────────────────┤
-│ 1. Auth Flow    │ 2. Live Dashboard │ 3. Plant Profile Mgmt     │
-├─────────────────┼───────────────────┼───────────────────────────┤
-│ • Splash Screen │ • Header & Status │ • Registered Plant Grid   │
-│ • Login Form    │ • Plant Selector  │ • Add Plant Modal Form    │
-│ • Register Form │ • 2x2 Metric Grid │ • Preferences Thresholds  │
-└─────────────────┴───────────────────┴───────────────────────────┘
+```text
+┌───────────────────────────────────────────────────────────────────────┐
+│                     FINAL FIGMA SCREEN ARCHITECTURE                  │
+├───────────────────┬───────────────────────┬──────────────────────────┤
+│ 1. Auth Flow      │ 2. Live Dashboard     │ 3. Plant Management      │
+├───────────────────┼───────────────────────┼──────────────────────────┤
+│ • Splash Screen    │ • Header + Status     │ • Plant Collection       │
+│ • Login Form      │ • Sensor Grid         │ • Add/Edit Plant Form    │
+│ • Register Form   │ • AI Recommendation   │ • Device Linking         │
+│ • Recovery Flow   │ • Pump Control        │ • Plant Preferences     │
+├───────────────────┼───────────────────────┼──────────────────────────┤
+│ 4. Camera View    │ 5. Data History      │ 6. Alert Center         │
+├───────────────────┼───────────────────────┼──────────────────────────┤
+│ • Live Stream     │ • Trend Analytics     │ • Smart Alerts           │
+│ • Plant Visual    │ • Charts & Graphs     │ • Notification Cards    │
+│ • Capture State   │ • Historical Filters  │ • Recommendation Feed   │
+└───────────────────┴───────────────────────┴──────────────────────────┘
 ```
 
 ---
 
 ### Screen 1: User Authentication Flow (Login / Registration)
-* **Layout Structure**: Vertical Auto-Layout, Center Aligned.
+* **Layout Structure**: Vertical Auto-Layout, centered composition.
 * **Top Header**:
-  * Brand Logo (Leaf Icon inside circular Emerald background).
-  * App Title: "FloraCare Smart Monitoring".
-  * Subtitle: "Real-time IoT Plant Intelligence".
+  * Brand logo: leaf icon inside emerald circle
+  * App title: "FloraCare Smart Monitoring"
+  * Subtitle: "Real-time IoT Plant Intelligence"
 * **Form Inputs**:
-  * Email Input Field (Prefix icon: `mail`, Placeholder: `gardener@example.com`).
-  * Password Input Field (Prefix icon: `lock`, Suffix icon: `eye_hide`).
-  * Name Input Field (For Registration screen).
+  * Email input with mail icon
+  * Password input with lock icon and visibility toggle
+  * Name input for registration
 * **Action Buttons**:
-  * Primary Button: "Sign In" / "Register Account" (Full-width, 48px height, rounded corners, Emerald gradient).
-  * Toggle Text Link: "Don't have an account? Register" / "Already have an account? Login".
+  * Primary CTA: "Sign In" / "Create Account"
+  * Secondary link: "Don't have an account? Register"
+  * Alternate action: "Continue as guest" (optional in final product)
+* **Visual Style**:
+  * Soft gradient from emerald to dark background
+  * Rounded cards and elevated input fields
 
 ---
 
 ### Screen 2: Live Sensor Dashboard (Main Home Screen)
-* **Layout Structure**: Scrollable Frame with Sticky Top Navigation & Fixed Bottom Navigation Bar.
+* **Layout Structure**: Scrollable frame with sticky top navigation and bottom navigation.
 * **Top Bar**:
-  * User Greeting ("Welcome back, Alex! 👋").
-  * Active Plant Dropdown Selector ("Living Room Monstera ▼").
-  * Hardware Status Badge: Green Pulsing Dot + Text `"Hardware: ONLINE"`.
+  * Greeting: "Welcome back, Alex! 👋"
+  * Active plant selector dropdown
+  * Device status badge: green dot + "Hardware: ONLINE"
 * **Hero Plant Card**:
-  * Plant Thumbnail Image (Rounded 12px).
-  * Plant Name & Species ("Monstera Deliciosa").
-  * Target Device ID (`Node: plant_node_01`).
-* **2x2 Sensor Live Grid (Real-Time Metrics)**:
-  1. **Temperature Card (DHT11/22)**:
-     * Icon: Thermometer Red/Orange accent.
-     * Big Value: `24.5 °C`.
-     * Status Pill: `Normal Range (18 - 30°C)`.
-  2. **Humidity Card (DHT11/22)**:
-     * Icon: Water Droplet Cyan/Blue accent.
-     * Big Value: `58 %`.
-     * Status Pill: `Optimal Moisture`.
+  * Plant image thumbnail
+  * Plant name and species
+  * Device ID: `Node: plant_node_01`
+  * Quick health status pill: `Healthy / Warning / Critical`
+* **2x2 Sensor Live Grid**:
+  1. **Temperature Card**:
+     * Value: `24.5 °C`
+     * Status: `Normal Range (18 - 30°C)`
+  2. **Humidity Card**:
+     * Value: `58 %`
+     * Status: `Optimal Moisture`
   3. **Soil Moisture Card**:
-     * Icon: Plant Soil Green accent.
-     * Big Value: `45 %`.
-     * Circular Progress Indicator / Gauge Bar.
-  4. **Sunlight / LDR Card**:
-     * Icon: Sun Bright Yellow accent.
-     * Big Value: `72 %`.
-     * Status Pill: `Bright Indirect Light`.
-* **Footer Status**: "Real-time streaming active • Syncs every 5s".
+     * Value: `45 %`
+     * Circular gauge and progress bar
+  4. **Sunlight Card**:
+     * Value: `72 %`
+     * Status: `Bright Indirect Light`
+* **AI Insight Panel**:
+  * "AI Recommendation" banner
+  * Short text: "Plant is healthy. Maintain current moisture range."
+  * Confidence indicator with percentage
+  * Suggestion CTA: "View full insight"
+* **Footer Status**: "Real-time streaming active • Syncs every 5s"
 
 ---
 
 ### Screen 3: Plant Profile Management Screen
-* **Layout Structure**: Vertical Stack with Floating Action Button (FAB).
-* **Header**: "My Plant Collection" + Search/Filter Bar.
+* **Layout Structure**: Vertical stack with floating action button.
+* **Header**: "My Plant Collection"
+* **Search / Filter Row**: plant search, filter by condition, sort by device
 * **Plant List Items**:
-  * Plant Card: Image, Custom Name, Species, Linked Device ID, Target Min/Max Threshold Summary.
-  * Swipe Actions: Edit Preferences / Delete Plant.
-* **"Add New Plant" Modal Component**:
-  * Input: Plant Nickname ("Balcony Fern").
-  * Input: Plant Species ("Nephrolepis exaltata").
-  * Input: Device MAC / Hardware ID ("plant_node_01").
-  * Slider Inputs (Set Preferences):
-    * Min/Max Soil Moisture Range (e.g., 30% - 80%).
-    * Min/Max Temperature Range (e.g., 18°C - 32°C).
-  * Button: "Save Plant Profile".
+  * Plant image
+  * Nickname and species
+  * Linked device ID
+  * Healthy range summary
+  * Status badge
+* **Add / Edit Plant Modal**:
+  * Plant nickname field
+  * Species field
+  * Linked device ID
+  * Min/Max moisture range
+  * Min/Max temperature range
+  * Min/Max light range
+  * Save button
+* **Actions**:
+  * Edit thresholds
+  * Delete plant
+  * Reconnect device
 
 ---
 
-## 🛠️ 3. Figma Auto-Layout Guidelines for Designers
-1. **Container Padding**: Use `20px` horizontal padding for screens.
-2. **Item Spacing**: Use `16px` gap for main layout stacks and `12px` gap inside metric cards.
-3. **Components & Variants**: Create a master component for `MetricCard` with 4 property variants (`Temperature`, `Humidity`, `SoilMoisture`, `Sunlight`).
+### Screen 4: AI Recommendation & Smart Alert Center
+* **Layout Structure**: Tabbed screen with summary and detail panels.
+* **Header**: "AI Care Recommendations"
+* **Recommendation Cards**:
+  * Health diagnosis
+  * Watering amount
+  * Pump duration estimate
+  * Next watering time
+* **Alert Cards**:
+  * `WARNING`: Low soil moisture
+  * `CRITICAL`: Heat stress detected
+  * `INFO`: Optimal conditions
+* **Buttons**:
+  * "Run Analysis"
+  * "Water Now"
+  * "View Details"
+* **AI Data Visualization**:
+  * Confidence bar or donut chart
+  * status labels
+  * recommendation text block
+
+---
+
+### Screen 5: Camera Live View
+* **Layout Structure**: Full-width live camera feed with overlaid controls.
+* **Header**:
+  * Plant camera title
+  * Live device indicator
+  * Snapshot button
+* **Live Preview Area**:
+  * ESP32 camera feed
+  * Plant visual status overlay
+  * status chips for humidity, light, and moisture
+* **Control Actions**:
+  * Capture image
+  * Focus toggle
+  * Zoom / fit view
+  * Switch camera
+* **Lower Panel**:
+  * visual health summary
+  * last synced time
+  * notes like "Leaf color healthy, soil slightly dry"
+
+---
+
+### Screen 6: Sensor History & Data Visualization
+* **Layout Structure**: Multi-panel analytics screen.
+* **Header**:
+  * "Plant Health History"
+  * Date range selector: 24h / 7d / 30d
+* **Chart Area**:
+  * temperature line chart
+  * humidity line chart
+  * soil moisture chart
+  * sunlight chart
+* **Insights Summary**:
+  * Average temperature
+  * Average moisture
+  * healthiest period
+  * lowest hydration period
+* **Filter Chips**:
+  * Temperature
+  * Humidity
+  * Soil Moisture
+  * Light
+* **Summary Footer**:
+  * "Last 7 days trend: stable and healthy"
+
+---
+
+### Screen 7: Smart Irrigation Control Panel
+* **Layout Structure**: Card-based control dashboard.
+* **Header**: "Watering Control"
+* **Current Status Panel**:
+  * Pump state: `OFF` / `AUTO` / `MANUAL`
+  * Last watering time
+  * Pump runtime
+* **Manual Action Card**:
+  * Button: "Water 5s"
+  * Button: "Water 10s"
+  * Button: "Stop Pump"
+* **Automation Section**:
+  * Auto mode toggle
+  * Minimum moisture threshold slider
+  * Trigger threshold field
+* **Safety Info**:
+  * Pump protection notice
+  * Water usage summary
+
+---
+
+## 🛠️ 3. Final Figma Auto-Layout Guidelines
+
+1. **Container Padding**: use `20px` horizontal padding for main screens.
+2. **Item Spacing**: use `16px` for section separation and `12px` inside cards.
+3. **Component Variants**:
+   * `MetricCard` variants: Temperature, Humidity, Soil Moisture, Light
+   * `AlertCard` variants: Info, Warning, Critical
+   * `CTAButton` variants: Primary, Secondary, Danger
+4. **Grid System**:
+   * use 12-column grid for desktop or large tablet mockups
+   * use 4-column grid for mobile design
+5. **Responsive Rules**:
+   * cards stack vertically on smaller screens
+   * charts compress smoothly without losing readability
+   * camera feed should maintain 16:9 orientation
+6. **Accessibility**:
+   * minimum button height: `48px`
+   * high contrast text on dark surfaces
+   * clear visual distinction for warning and critical states
+
+---
+
+## 🧩 4. Core UI Components
+
+### 4.1 Metric Card
+* Title
+* Icon
+* Large value
+* Status pill
+* Trend indicator (optional)
+
+### 4.2 Alert Card
+* Icon: exclamation / check / info
+* Title and subtitle
+* Severity color bar
+* Action button
+
+### 4.3 Plant Card
+* Thumbnail image
+* Nickname
+* Species
+* Device ID
+* Status indicator
+* Quick action menu
+
+### 4.4 Chart Panel
+* Title
+* Date filters
+* Graph with axis labels
+* Summary insight below
+
+### 4.5 AI Recommendation Banner
+* Recommendation title
+* Confidence status
+* Quick action CTA
+* Health badge
+
+---
+
+## 📐 5. Final Design Principles
+
+* Keep the interface clean, calm, and plant-focused
+* Use green as the primary product color for health and trust
+* Distinguish warning and critical states immediately through color and motion
+* Prioritize readability of sensor data and recommendation actions
+* Make AI suggestions actionable and easy to understand
+* Ensure the app feels premium but friendly and functional for everyday users
+
+---
+
+## ✅ 6. Final Product Summary
+
+This design specification represents the complete Smart Plant Care System UI/UX for a fully integrated product:
+
+- real-time monitoring
+- AI diagnosis and recommendation engine
+- automated watering control
+- camera-based visual monitoring
+- history and analytics
+- automated alerts and notifications
+
+The final interface is designed to feel modern, intuitive, and trustworthy for plant owners using a connected smart gardening system.
