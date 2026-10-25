@@ -3,8 +3,12 @@ import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/plant_service.dart';
 import '../../services/sensor_service.dart';
+import '../../services/ai_service.dart';
+import '../../services/pump_control_service.dart';
 import '../../models/plant_model.dart';
 import '../plants/plant_management_screen.dart';
+import '../history/sensor_history_chart_screen.dart';
+import '../camera/live_camera_screen.dart';
 
 class LiveDashboardScreen extends StatefulWidget {
   const LiveDashboardScreen({super.key});
@@ -31,8 +35,9 @@ class _LiveDashboardScreenState extends State<LiveDashboardScreen> {
     final authService = Provider.of<AuthService>(context);
     final plantService = Provider.of<PlantService>(context);
     final sensorService = Provider.of<SensorService>(context);
+    final aiService = Provider.of<AIService>(context);
+    final pumpService = Provider.of<PumpControlService>(context);
 
-    // Whenever active plant changes, bind sensor stream to plant's hardware deviceId
     final activePlant = plantService.selectedPlant;
     if (activePlant != null) {
       sensorService.listenToDevice(activePlant.deviceId);
@@ -40,25 +45,58 @@ class _LiveDashboardScreenState extends State<LiveDashboardScreen> {
 
     final sensorData = sensorService.currentReadings;
 
+    // Trigger AI model analysis whenever fresh telemetry arrives
+    aiService.analyzeTelemetry(sensorData);
+    final aiHealth = aiService.healthDiagnosis;
+    final aiWatering = aiService.wateringPrediction;
+
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1E293B),
         elevation: 0,
+        titleSpacing: 12,
         title: const Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.eco, color: Color(0xFF4CAF50)),
-            SizedBox(width: 8),
-            Text(
-              "FloraCare Dashboard",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            Icon(Icons.eco, color: Color(0xFF4CAF50), size: 22),
+            SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                "FloraCare",
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
             ),
           ],
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.show_chart, color: Color(0xFF4CAF50)),
+            tooltip: "Analytics History",
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SensorHistoryChartScreen()),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.videocam_outlined, color: Color(0xFF4CAF50)),
+            tooltip: "Live Camera Stream",
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const LiveCameraScreen(
+                    streamUrl: "http://192.168.153.94:80/stream",
+                  ),
+                ),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.yard_outlined, color: Colors.white),
-            tooltip: "Manage Plants",
             onPressed: () {
               Navigator.push(
                 context,
@@ -68,7 +106,6 @@ class _LiveDashboardScreenState extends State<LiveDashboardScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white70),
-            tooltip: "Sign Out",
             onPressed: () => authService.signOut(),
           ),
         ],
@@ -78,7 +115,53 @@ class _LiveDashboardScreenState extends State<LiveDashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top Section: Plant Selector & Hardware Status
+            // 🚨 AUTOMATED ALERTS BANNER
+            if (aiHealth.alertLevel == "CRITICAL" || aiHealth.alertLevel == "WARNING")
+              Container(
+                margin: const EdgeInsets.only(bottom: 20),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: aiHealth.alertLevel == "CRITICAL"
+                      ? Colors.redAccent.withValues(alpha: 0.2)
+                      : Colors.amberAccent.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: aiHealth.alertLevel == "CRITICAL" ? Colors.redAccent : Colors.amberAccent,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      aiHealth.alertLevel == "CRITICAL" ? Icons.error : Icons.warning_amber_rounded,
+                      color: aiHealth.alertLevel == "CRITICAL" ? Colors.redAccent : Colors.amberAccent,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "AI ALERT: ${aiHealth.healthStatus}",
+                            style: TextStyle(
+                              color: aiHealth.alertLevel == "CRITICAL" ? Colors.redAccent : Colors.amberAccent,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            aiHealth.recommendation,
+                            style: const TextStyle(color: Colors.white, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            // Top Header: Active Plant & Node Status
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -115,14 +198,10 @@ class _LiveDashboardScreenState extends State<LiveDashboardScreen> {
                           },
                         )
                       else
-                        const Text(
-                          "No Plants Added",
-                          style: TextStyle(color: Colors.white, fontSize: 16),
-                        ),
+                        const Text("No Plants Added", style: TextStyle(color: Colors.white, fontSize: 16)),
                     ],
                   ),
                 ),
-                // Status Badge
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
@@ -132,7 +211,6 @@ class _LiveDashboardScreenState extends State<LiveDashboardScreen> {
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: sensorService.isConnected ? const Color(0xFF4CAF50) : Colors.redAccent,
-                      width: 1,
                     ),
                   ),
                   child: Row(
@@ -161,71 +239,144 @@ class _LiveDashboardScreenState extends State<LiveDashboardScreen> {
             ),
             const SizedBox(height: 20),
 
-            // Active Plant Hero Card
-            if (activePlant != null)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF2E7D32), Color(0xFF1E293B)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+            // 💧 WATER PUMP MANUAL OVERRIDE CONTROL CARD
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFF4CAF50).withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4CAF50).withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.water_drop, color: Color(0xFF4CAF50), size: 26),
                   ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.local_florist, color: Colors.white, size: 36),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Water Pump Override",
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          pumpService.isPumping ? "🌊 PUMP ACTIVE..." : "Relay Status: READY",
+                          style: TextStyle(
+                            color: pumpService.isPumping ? Colors.cyanAccent : Colors.grey[400],
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            activePlant.name,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            activePlant.species,
-                            style: const TextStyle(color: Colors.white70, fontSize: 14),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            "Device ID: ${activePlant.deviceId}",
-                            style: const TextStyle(color: Color(0xFF4CAF50), fontSize: 12),
-                          ),
-                        ],
-                      ),
+                  ),
+                  ElevatedButton(
+                    onPressed: pumpService.isPumping || activePlant == null
+                        ? null
+                        : () async {
+                            try {
+                              await pumpService.triggerWaterPump(
+                                deviceId: activePlant.deviceId,
+                                durationSeconds: 3,
+                              );
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text("Pump pulse signal sent to ESP32!"),
+                                    backgroundColor: Color(0xFF2E7D32),
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text("Pump error: $e"),
+                                    backgroundColor: Colors.redAccent,
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2E7D32),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
-                  ],
-                ),
+                    child: const Text("Water Now", style: TextStyle(color: Colors.white, fontSize: 13)),
+                  ),
+                ],
               ),
+            ),
+            const SizedBox(height: 20),
 
-            const SizedBox(height: 24),
-            const Text(
-              "Real-time Sensor Readings",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+            // 🤖 AI RECOMMENDATION & PREDICTION CARD (Overflow-free)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white10),
               ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.psychology, color: Color(0xFF4CAF50)),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          "AI Health & Irrigation Engine",
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          "Diagnosis: ${aiHealth.healthStatus}",
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Color(0xFF4CAF50), fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        "Confidence: ${aiHealth.confidence}%",
+                        style: const TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text("Predicted Water Vol: ${aiWatering.waterAmountMl} mL", style: const TextStyle(color: Colors.white, fontSize: 13)),
+                  Text("Next Irrigation Window: ~${aiWatering.hoursUntilNextWater} Hours", style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            const Text(
+              "Live IoT Telemetry Grid",
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
 
-            // 2x2 Metric Cards Grid
+            // 2x2 Sensor Card Grid
             GridView.count(
               crossAxisCount: 2,
               crossAxisSpacing: 16,
@@ -238,9 +389,7 @@ class _LiveDashboardScreenState extends State<LiveDashboardScreen> {
                   value: "${sensorData.temperature.toStringAsFixed(1)} °C",
                   icon: Icons.thermostat,
                   color: Colors.orangeAccent,
-                  subtitle: activePlant != null
-                      ? "Target: ${activePlant.minTemperature}-${activePlant.maxTemperature}°C"
-                      : "DHT11 Sensor",
+                  subtitle: activePlant != null ? "Target: ${activePlant.minTemperature}-${activePlant.maxTemperature}°C" : "DHT11 Sensor",
                 ),
                 _buildMetricCard(
                   title: "Air Humidity",
@@ -254,9 +403,7 @@ class _LiveDashboardScreenState extends State<LiveDashboardScreen> {
                   value: "${sensorData.soilMoisture} %",
                   icon: Icons.grass,
                   color: const Color(0xFF4CAF50),
-                  subtitle: activePlant != null
-                      ? "Target: ${activePlant.minSoilMoisture}-${activePlant.maxSoilMoisture}%"
-                      : "Analog Moisture",
+                  subtitle: activePlant != null ? "Target: ${activePlant.minSoilMoisture}-${activePlant.maxSoilMoisture}%" : "Analog Moisture",
                 ),
                 _buildMetricCard(
                   title: "Light Level",
@@ -294,25 +441,15 @@ class _LiveDashboardScreenState extends State<LiveDashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                title,
-                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
-              ),
+              Text(title, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14)),
               Icon(icon, color: color, size: 24),
             ],
           ),
           Text(
             value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold),
           ),
-          Text(
-            subtitle,
-            style: TextStyle(color: Colors.grey[500], fontSize: 11),
-          ),
+          Text(subtitle, style: TextStyle(color: Colors.grey[500], fontSize: 11)),
         ],
       ),
     );

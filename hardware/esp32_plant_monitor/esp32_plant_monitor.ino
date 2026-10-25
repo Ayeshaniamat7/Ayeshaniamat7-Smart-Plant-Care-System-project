@@ -1,20 +1,3 @@
-/*
- * =====================================================================================
- * Smart Plant Care System - 70% Prototype Phase
- * Microcontroller Hardware Code (ESP32 / ESP8266)
- * 
- * Target Microcontroller: ESP32 (or ESP8266 NodeMCU)
- * IDE: Arduino IDE
- * Sensors:
- *   - DHT11 / DHT22 (Temperature & Humidity) -> GPIO 4
- *   - Capacitive/Resistive Soil Moisture Sensor -> GPIO 34 (Analog ADC1)
- *   - LDR (Light Dependent Resistor) -> GPIO 35 (Analog ADC1)
- * 
- * Network Protocol: WiFi HTTP REST / Firebase Realtime Database REST API
- * Exclusions: Camera Module, Relay Module, Water Pump (Deferred to 100% Phase)
- * =====================================================================================
- */
-
 #if defined(ESP32)
   #include <WiFi.h>
   #include <HTTPClient.h>
@@ -24,108 +7,157 @@
   #include <WiFiClientSecure.h>
 #endif
 
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 #include <DHT.h>
-#include <ArduinoJson.h> // Library: ArduinoJson by Benoit Blanchon (v6.x)
+#include <ArduinoJson.h>
 
-// ================= USER CONFIGURATION =================
+// ------------------ USER SETTINGS ------------------
 const char* WIFI_SSID     = "Infinix SMART 9 HD";
 const char* WIFI_PASSWORD = "210692525";
-
-// Firebase Realtime Database Config
-// Format: https://YOUR_PROJECT_ID.firebaseio.com or https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com
 const char* FIREBASE_HOST = "https://smart-plant-care-95490-default-rtdb.firebaseio.com";
 const char* FIREBASE_AUTH = "H8EaInbYEEQJVHBJ5xCOww8yYt3S7YgudKCWtb4x";
-const char* DEVICE_ID     = "plant_node_01"; // Unique Device ID linked to plant profile
+const char* DEVICE_ID     = "plant_node_01";
+const char* CAM_STREAM_URL = "http://192.168.153.94:80/stream";
 
-// Pin Configuration
-#define DHTPIN        4      // Digital pin connected to DHT sensor
-#define DHTTYPE       DHT11  // DHT 11 (Change to DHT22 if using DHT22)
-#define SOIL_PIN      34     // Analog pin connected to Soil Moisture sensor (ESP32 GPIO 34)
-#define LDR_PIN       5     // Analog pin connected to LDR sensor (ESP32 GPIO 35)
+// ------------------ PIN CONFIG ------------------
+#define DHTPIN        4
+#define DHTTYPE       DHT11
+#define SOIL_PIN      34
+#define LDR_PIN       5
+#define RELAY_PIN     26
+#define OLED_SDA      21
+#define OLED_SCL      22
 
-// Sensor Calibration Parameters
-const int SOIL_DRY_VAL = 3500; // ADC value when soil is completely dry
-const int SOIL_WET_VAL = 1400; // ADC value when sensor is immersed in water
-const int ADC_MAX_VAL  = 4095; // 12-bit ADC for ESP32 (1024 for ESP8266)
+// IMPORTANT: common relay module is ACTIVE-LOW
+#define RELAY_ON      LOW
+#define RELAY_OFF     HIGH
 
-// Update Interval (in milliseconds)
-const unsigned long UPDATE_INTERVAL = 5000; // 5 seconds interval for live monitoring
-unsigned long lastUpdate = 0;
+// ------------------ OLED ------------------
+#define SCREEN_WIDTH  128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET    -1
+#define SCREEN_ADDR   0x3C
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+bool oledReady = false;
+
+// ------------------ CALIBRATION ------------------
+const int SOIL_DRY_VAL = 3500;
+const int SOIL_WET_VAL = 1400;
+const int ADC_MAX_VAL  = 4095;
+
+int autoSoilThresholdLow  = 30;
+int autoSoilThresholdHigh = 55;
+
+// ------------------ PUMP STATE ------------------
+bool manualOverride = false;
+bool manualPumpCmd  = false;
+bool isPumpRunning  = false;
+
+// ------------------ TIMERS ------------------
+const unsigned long UPDATE_INTERVAL  = 5000;
+const unsigned long HISTORY_INTERVAL = 60000;
+unsigned long lastUpdate  = 0;
+unsigned long lastHistory = 0;
 
 DHT dht(DHTPIN, DHTTYPE);
 
-// ================= SETUP =================
+// ------------------ PROTOTYPES ------------------
+void connectWiFi();
+void fetchPumpControlFromFirebase();
+void evaluatePumpLogic(int soilMoisturePct);
+String generateAlertMessage(float temp, float hum, int soil, int light);
+void updateOLED(float temp, float hum, int soil, int light);
+void sendLiveDataToFirebase(float temp, float hum, int soil, int light, String alertMsg);
+void logHistoryToFirebase(float temp, float hum, int soil, int light);
+
 void setup() {
   Serial.begin(115200);
   delay(1000);
 
-  Serial.println("\n--- Smart Plant Care System: Initializing Hardware ---");
+  Serial.println("\n--- Smart Plant Care System ---");
 
-  // Initialize DHT Sensor
+  pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, RELAY_OFF); // relay off at startup
+  Serial.println("[OK] Relay initialized OFF.");
+
   dht.begin();
-  Serial.println("[OK] DHT Sensor Initialized.");
-
-  // Configure Analog Pins
   pinMode(SOIL_PIN, INPUT);
   pinMode(LDR_PIN, INPUT);
+  Serial.println("[OK] Sensors initialized.");
 
-  // Connect to WiFi
+  Wire.begin(OLED_SDA, OLED_SCL);
+  if (display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDR)) {
+    oledReady = true;
+    display.clearDisplay();
+    display.setTextColor(SSD1306_WHITE);
+    display.setTextSize(1);
+    display.setCursor(10, 10);
+    display.println("SMART PLANT CARE");
+    display.setCursor(15, 30);
+    display.println("Booting System...");
+    display.display();
+    Serial.println("[OK] OLED initialized.");
+  } else {
+    Serial.println("[WARN] OLED not detected!");
+  }
+
   connectWiFi();
 }
 
-// ================= LOOP =================
 void loop() {
-  // Ensure WiFi connection remains active
   if (WiFi.status() != WL_CONNECTED) {
     connectWiFi();
   }
 
-  // Periodically read sensors and push to Backend
   if (millis() - lastUpdate >= UPDATE_INTERVAL) {
     lastUpdate = millis();
 
-    // 1. Read DHT Sensor
     float tempC = dht.readTemperature();
     float humidity = dht.readHumidity();
 
-    // Validate DHT readings
     if (isnan(tempC) || isnan(humidity)) {
-      Serial.println("[WARN] Failed to read from DHT sensor! Retrying next cycle...");
-      tempC = 25.0; // Fallback value for testing if disconnected
+      Serial.println("[WARN] DHT failed, using fallback values.");
+      tempC = 25.0;
       humidity = 60.0;
     }
 
-    // 2. Read Soil Moisture Sensor
     int rawSoil = analogRead(SOIL_PIN);
-    // Map raw ADC to percentage (0% = dry, 100% = wet)
     int soilMoisturePct = map(rawSoil, SOIL_DRY_VAL, SOIL_WET_VAL, 0, 100);
     soilMoisturePct = constrain(soilMoisturePct, 0, 100);
 
-    // 3. Read LDR Sensor (Digital Switch Mode)
     int rawLDR = digitalRead(LDR_PIN);
-    // HIGH = Dark (0%), LOW = Light (100%)
     int lightPct = (rawLDR == HIGH) ? 0 : 100;
-    // int rawLDR = analogRead(LDR_PIN);
-    // // Map raw ADC to light intensity percentage (0% = dark, 100% = bright daylight)
-    // int lightPct = map(rawLDR, 0, ADC_MAX_VAL, 0, 100);
-    // lightPct = constrain(lightPct, 0, 100);
 
-    // Print to Serial Monitor
-    Serial.println("\n--- Live Sensor Readings ---");
-    Serial.printf("Temperature   : %.2f *C\n", tempC);
-    Serial.printf("Humidity      : %.2f %%\n", humidity);
-    Serial.printf("Soil Moisture : %d %% (Raw: %d)\n", soilMoisturePct, rawSoil);
-    Serial.printf("Light Level   : %d %% (Raw: %d)\n", lightPct, rawLDR);
+    fetchPumpControlFromFirebase();
+    evaluatePumpLogic(soilMoisturePct);
 
-    // 4. Transmit Payload to Firebase Realtime Database
-    sendDataToFirebase(tempC, humidity, soilMoisturePct, lightPct);
+    String alertMsg = generateAlertMessage(tempC, humidity, soilMoisturePct, lightPct);
+    updateOLED(tempC, humidity, soilMoisturePct, lightPct);
+
+    Serial.println("\n--- Live Status ---");
+    Serial.printf("Temp: %.1f C | Humidity: %.1f %%\n", tempC, humidity);
+    Serial.printf("Soil: %d %% | Light: %d %%\n", soilMoisturePct, lightPct);
+    Serial.printf("Pump: %s | Mode: %s\n", isPumpRunning ? "ON" : "OFF", manualOverride ? "MANUAL" : "AUTO");
+    Serial.printf("Alert: %s\n", alertMsg.c_str());
+
+    sendLiveDataToFirebase(tempC, humidity, soilMoisturePct, lightPct, alertMsg);
+
+    if (millis() - lastHistory >= HISTORY_INTERVAL) {
+      lastHistory = millis();
+      logHistoryToFirebase(tempC, humidity, soilMoisturePct, lightPct);
+    }
   }
 }
 
-// ================= HELPER FUNCTIONS =================
 void connectWiFi() {
   Serial.printf("[WIFI] Connecting to SSID: %s ", WIFI_SSID);
   WiFi.mode(WIFI_STA);
+  #if defined(ESP32)
+    WiFi.setTxPower(WIFI_POWER_11dBm);
+  #endif
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   int attempts = 0;
@@ -136,59 +168,160 @@ void connectWiFi() {
   }
 
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\n[WIFI] Connected Successfully!");
-    Serial.print("[WIFI] IP Address: ");
+    Serial.println("\n[WIFI] Connected");
     Serial.println(WiFi.localIP());
   } else {
-    Serial.println("\n[WIFI] Connection Failed! Will retry...");
+    Serial.println("\n[WIFI] Failed, retrying...");
   }
 }
 
-void sendDataToFirebase(float temp, float hum, int soil, int light) {
+void fetchPumpControlFromFirebase() {
   if (WiFi.status() != WL_CONNECTED) return;
 
-#if defined(ESP32)
   HTTPClient http;
-#elif defined(ESP8266)
-  WiFiClientSecure client;
-  client.setInsecure(); // Bypass SSL fingerprint verification for ease in prototype
-  HTTPClient http;
-#endif
+  String url = String(FIREBASE_HOST) + "/devices/" + String(DEVICE_ID) + "/control.json";
+  if (String(FIREBASE_AUTH).length() > 0 && String(FIREBASE_AUTH) != "YOUR_FIREBASE_DATABASE_SECRET_OR_ID_TOKEN") {
+    url += "?auth=" + String(FIREBASE_AUTH);
+  }
 
-  // Construct Firebase REST API URL
-  // Node path: /devices/{DEVICE_ID}/live.json
+  http.begin(url);
+  int httpCode = http.GET();
+
+  if (httpCode == HTTP_CODE_OK) {
+    String payload = http.getString();
+
+    if (payload != "null" && payload.length() > 2) {
+      StaticJsonDocument<200> doc;
+      DeserializationError error = deserializeJson(doc, payload);
+
+      if (!error) {
+        if (doc.containsKey("manualOverride")) {
+          manualOverride = doc["manualOverride"].as<bool>();
+        }
+        if (doc.containsKey("pumpSwitch")) {
+          manualPumpCmd = doc["pumpSwitch"].as<bool>();
+        }
+      }
+    }
+  }
+
+  http.end();
+}
+
+void evaluatePumpLogic(int soilMoisturePct) {
+  if (manualOverride) {
+    isPumpRunning = manualPumpCmd;
+  } else {
+    if (soilMoisturePct < autoSoilThresholdLow) {
+      isPumpRunning = true;
+    } else if (soilMoisturePct >= autoSoilThresholdHigh) {
+      isPumpRunning = false;
+    }
+  }
+
+  digitalWrite(RELAY_PIN, isPumpRunning ? RELAY_ON : RELAY_OFF);
+}
+
+String generateAlertMessage(float temp, float hum, int soil, int light) {
+  if (soil < 25) return "CRITICAL: Soil very dry!";
+  if (temp > 38.0) return "WARNING: High temperature alert!";
+  if (temp < 10.0) return "WARNING: Low temperature alert!";
+  if (light == 0) return "INFO: Low light / night mode.";
+  return "NORMAL: Plant conditions are optimal.";
+}
+
+void updateOLED(float temp, float hum, int soil, int light) {
+  if (!oledReady) return;
+
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setCursor(0, 0);
+  display.print("PLANT CARE ");
+  display.println(WiFi.status() == WL_CONNECTED ? "[WIFI OK]" : "[NO WIFI]");
+  display.drawLine(0, 11, 128, 11, SSD1306_WHITE);
+
+  display.setCursor(0, 15);
+  display.printf("Temp: %.1fC  Hum:%d%%", temp, (int)hum);
+
+  display.setCursor(0, 27);
+  display.printf("Soil: %d%%   Light:%d%%", soil, light);
+
+  display.setCursor(0, 39);
+  display.printf("Pump: %s (%s)", isPumpRunning ? "ON " : "OFF", manualOverride ? "MANUAL" : "AUTO");
+
+  display.setCursor(0, 52);
+  if (soil < autoSoilThresholdLow) {
+    display.print("Alert: SOIL DRY!");
+  } else {
+    display.print("Cam & System: ONLINE");
+  }
+
+  display.display();
+}
+
+void sendLiveDataToFirebase(float temp, float hum, int soil, int light, String alertMsg) {
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  HTTPClient http;
   String url = String(FIREBASE_HOST) + "/devices/" + String(DEVICE_ID) + "/live.json";
   if (String(FIREBASE_AUTH).length() > 0 && String(FIREBASE_AUTH) != "YOUR_FIREBASE_DATABASE_SECRET_OR_ID_TOKEN") {
     url += "?auth=" + String(FIREBASE_AUTH);
   }
 
-#if defined(ESP32)
   http.begin(url);
-#elif defined(ESP8266)
-  http.begin(client, url);
-#endif
-
   http.addHeader("Content-Type", "application/json");
 
-  // Create JSON Payload
+  StaticJsonDocument<384> doc;
+  doc["temperature"]     = temp;
+  doc["humidity"]        = hum;
+  doc["soilMoisture"]    = soil;
+  doc["lightLevel"]      = light;
+  doc["pumpStatus"]      = isPumpRunning ? "ON" : "OFF";
+  doc["pumpMode"]        = manualOverride ? "MANUAL" : "AUTO";
+  doc["cameraStreamUrl"] = CAM_STREAM_URL;
+  doc["alert"]           = alertMsg;
+  doc["timestamp"]       = millis();
+  doc["status"]          = "online";
+
+  String jsonPayload;
+  serializeJson(doc, jsonPayload);
+
+  int httpResponseCode = http.PUT(jsonPayload);
+  if (httpResponseCode > 0) {
+    Serial.printf("[HTTP] Live data updated. Code: %d\n", httpResponseCode);
+  } else {
+    Serial.printf("[HTTP] Live error: %s\n", http.errorToString(httpResponseCode).c_str());
+  }
+
+  http.end();
+}
+
+void logHistoryToFirebase(float temp, float hum, int soil, int light) {
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  HTTPClient http;
+  String url = String(FIREBASE_HOST) + "/devices/" + String(DEVICE_ID) + "/history.json";
+  if (String(FIREBASE_AUTH).length() > 0 && String(FIREBASE_AUTH) != "YOUR_FIREBASE_DATABASE_SECRET_OR_ID_TOKEN") {
+    url += "?auth=" + String(FIREBASE_AUTH);
+  }
+
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
+
   StaticJsonDocument<200> doc;
   doc["temperature"]  = temp;
   doc["humidity"]     = hum;
   doc["soilMoisture"] = soil;
   doc["lightLevel"]   = light;
-  doc["timestamp"]    = millis(); // Or Unix epoch timestamp
-  doc["status"]       = "online";
+  doc["pumpRunning"]  = isPumpRunning;
+  doc["timestamp"]    = millis();
 
   String jsonPayload;
   serializeJson(doc, jsonPayload);
 
-  // Send PUT request to overwrite live readings node
-  int httpResponseCode = http.PUT(jsonPayload);
-
+  int httpResponseCode = http.POST(jsonPayload);
   if (httpResponseCode > 0) {
-    Serial.printf("[HTTP] Firebase Live Data Updated! Response Code: %d\n", httpResponseCode);
-  } else {
-    Serial.printf("[HTTP] Error updating Firebase! HTTP Code: %s\n", http.errorToString(httpResponseCode).c_str());
+    Serial.printf("[HTTP] History logged. Code: %d\n", httpResponseCode);
   }
 
   http.end();

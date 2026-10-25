@@ -17,6 +17,8 @@ dependencies:
   provider: ^6.1.2
   google_fonts: ^6.2.1
   cupertino_icons: ^1.0.6
+  http: ^1.2.0
+  fl_chart: ^0.69.0
 
 dev_dependencies:
   flutter_test:
